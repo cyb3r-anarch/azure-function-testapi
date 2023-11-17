@@ -9,6 +9,11 @@ import com.microsoft.azure.functions.annotation.AuthorizationLevel;
 import com.microsoft.azure.functions.annotation.FunctionName;
 import com.microsoft.azure.functions.annotation.HttpTrigger;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.Optional;
 
 /**
@@ -30,14 +35,41 @@ public class Function {
             final ExecutionContext context) {
         context.getLogger().info("Java HTTP trigger processed a request.");
 
-        // Parse query parameter
-        final String query = request.getQueryParameters().get("name");
-        final String name = request.getBody().orElse(query);
+        // Get the uploaded file content from the request body
+        byte[] fileContent = request.getBody().map(String::getBytes).orElse(null);
 
-        if (name == null) {
-            return request.createResponseBuilder(HttpStatus.BAD_REQUEST).body("Please pass a name on the query string or in the request body").build();
-        } else {
-            return request.createResponseBuilder(HttpStatus.OK).body("Hello, " + name).build();
+        if (fileContent == null) {
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST).body("Please upload a file.").build();
+        }
+
+        // Parse PDF content to text using PDFBox
+        String pdfText = parsePdf(fileContent);
+
+        String jsonResponse = "{\"parsedText\": \"" + pdfText + "\"}";
+
+        return request.createResponseBuilder(HttpStatus.OK).body(jsonResponse).build();
+
+
+        // Process the extracted text and return the results to the frontend
+        // String processedResult = processPdfText(pdfText);
+        
+    }
+
+    private String parsePdf(byte[] pdfContent) {
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfContent))) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            return stripper.getText(document);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
         }
     }
+
+    private String processPdfText(String pdfText) {
+        // Your logic for processing the extracted text goes here
+        // This could involve identifying questions, answers, etc.
+        // You may need to customize this based on the structure of your PDFs
+        return "Processed result: " + pdfText;
+    }
 }
+
